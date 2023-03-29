@@ -137,6 +137,40 @@ async function handleMessageCreate(client, msg, openai) {
   } else {
     await thinkingMessage.edit(chatGPTResponse);
   }
+
+  // Check if the channel name contains an emoji
+  const emojiRegex = new RegExp(
+    "<a?:.+?:\\d{18}|\\p{Extended_Pictographic}",
+    "gu"
+  );
+  if (!emojiRegex.test(msg.channel.name)) {
+    const messages = [
+      {
+        role: "system",
+        content: `Create a new channel name following this template: "emoji-keyword1-keyword2". For example, "🤖-emoji-testing". Choose two keywords from this paragraph: ${chatGPTResponse}`,
+      },
+    ];
+
+    try {
+      const nameCompletion = await openai.createChatCompletion({
+        model: "gpt-3.5-turbo",
+        messages,
+        max_tokens: 50,
+        n: 1,
+        stop: null,
+        temperature: 0.7,
+      });
+
+      const newChannelName =
+        nameCompletion.data.choices[0].message.content.trim();
+
+      // Log the new channel name
+      console.log("New channel name:", newChannelName);
+      msg.channel.setName(newChannelName);
+    } catch (error) {
+      console.error("Error creating new channel name:", error);
+    }
+  }
 }
 
 module.exports = handleMessageCreate;
