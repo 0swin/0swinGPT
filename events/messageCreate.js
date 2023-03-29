@@ -60,8 +60,13 @@ async function handleMessageCreate(client, msg, openai) {
       })
     );
   }
-
-  const thinkingMessage = await msg.reply("I'm thinking...");
+  // Replace 'EMOJI_NAME' with the name of the custom emoji you want to use
+  const customEmoji = msg.guild.emojis.cache.find(
+    (emoji) => emoji.name === "spinning_cat"
+  );
+  const thinkingMessage = await msg.reply(
+    `I'm thinking... ${customEmoji.toString()}`
+  );
 
   const fetchedMessages = await msg.channel.messages.fetch({ limit: 100 });
   const conversation = fetchedMessages
@@ -84,7 +89,7 @@ async function handleMessageCreate(client, msg, openai) {
         savedSummary
           ? `Current summary of the conversation: ${savedSummary}. `
           : ""
-      }You are a ChatGPT bot in a Discord conversation. If you need to mention someone, use <@user-id>. <@1088521023466508478> is your own user ID.`,
+      }You are a ChatGPT bot in a Discord conversation. If you need to mention someone, use <@user-id>. <@1088521023466508478> is your own user ID. You have the capacity to send emojis using this syntax <:emoji_name:emoji_id> raw in a message.`,
     },
     ...conversation.map((line) => {
       const [author, content] = line.split(": ");
@@ -118,7 +123,7 @@ async function handleMessageCreate(client, msg, openai) {
     messages: messageObjects,
   });
 
-  const separator = "Answer: ";
+  const separator = "Answer:";
   const [summary, chatGPTResponse] = completion.data.choices[0].message.content
     .trim()
     .split(separator)
