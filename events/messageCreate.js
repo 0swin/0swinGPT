@@ -15,39 +15,41 @@ async function handleMessageCreate(client, msg, openai) {
   const links = userInput.match(linkRegex);
 
   if (links) {
-    for (const link of links) {
-      try {
-        const response = await new Promise((resolve, reject) => {
-          https.get(link, resolve).on("error", reject);
-        });
-        const html = await new Promise((resolve) => {
-          let data = "";
-          response.on("data", (chunk) => {
-            data += chunk;
+    await Promise.all(
+      links.map(async (link) => {
+        try {
+          const response = await new Promise((resolve, reject) => {
+            https.get(link, resolve).on("error", reject);
           });
-          response.on("end", () => {
-            resolve(data);
+          const html = await new Promise((resolve) => {
+            let data = "";
+            response.on("data", (chunk) => {
+              data += chunk;
+            });
+            response.on("end", () => {
+              resolve(data);
+            });
           });
-        });
-        const doc = new JSDOM(html, { url: link });
-        const reader = new Readability(doc.window.document);
-        const article = reader.parse();
+          const doc = new JSDOM(html, { url: link });
+          const reader = new Readability(doc.window.document);
+          const article = reader.parse();
 
-        // Clean up the parsed text
-        const cleanedText = article.textContent
-          .trim()
-          .replace(/\n\s+/g, "\n") // Remove leading spaces on each line
-          .replace(/\n{3,}/g, "\n\n"); // Keep only one newline when there are multiple in a row
+          // Clean up the parsed text
+          const cleanedText = article.textContent
+            .trim()
+            .replace(/\n\s+/g, "\n") // Remove leading spaces on each line
+            .replace(/\n{3,}/g, "\n\n"); // Keep only one newline when there are multiple in a row
 
-        userInput = userInput.replace(link, `${link} - ${cleanedText}`);
-      } catch (err) {
-        console.error(`Error processing link: ${link}`, err);
-        userInput = userInput.replace(
-          link,
-          `${link} - Error processing link: ${err.message}`
-        );
-      }
-    }
+          userInput = userInput.replace(link, `${link} - ${cleanedText}`);
+        } catch (err) {
+          console.error(`Error processing link: ${link}`, err);
+          userInput = userInput.replace(
+            link,
+            `${link} - Error processing link: ${err.message}`
+          );
+        }
+      })
+    );
   }
 
   const thinkingMessage = await msg.reply("I'm thinking...");
