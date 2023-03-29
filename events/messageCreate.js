@@ -2,8 +2,17 @@ const https = require("https");
 const { Readability } = require("@mozilla/readability");
 const { JSDOM } = require("jsdom");
 
+// Create a Map to store the summaries
+const channelSummaries = new Map();
+
 async function handleMessageCreate(client, msg, openai) {
   if (msg.author.bot) return; // Ignore messages from bots
+
+  // Get the saved summary for the current channel, if it exists
+  const channelId = msg.channel.id;
+  const savedSummary = channelSummaries.has(channelId)
+    ? `Summary: ${channelSummaries.get(channelId)}`
+    : "";
 
   // Check if the bot is mentioned
   if (!msg.mentions.has(client.user)) return;
@@ -60,9 +69,9 @@ async function handleMessageCreate(client, msg, openai) {
     .map((m) => `${m.author.username}: ${m.content}`)
     .reverse() // Reverse the order to make it chronological
     .reduce((acc, cur) => {
-      if (acc.length < 600) {
+      if (acc.length < 400) {
         const newContent =
-          cur.length <= 600 - acc.length ? cur : cur.slice(0, 600 - acc.length);
+          cur.length <= 400 - acc.length ? cur : cur.slice(0, 400 - acc.length);
         acc.push(newContent);
       }
       return acc;
@@ -71,8 +80,11 @@ async function handleMessageCreate(client, msg, openai) {
   const messageObjects = [
     {
       role: "system",
-      content:
-        "You are a ChatGPT bot in a Discord conversation. If you need to mention someone, use <@user-id>",
+      content: `${
+        savedSummary
+          ? `Current summary of the conversation: ${savedSummary}. `
+          : ""
+      }You are a ChatGPT bot in a Discord conversation. If you need to mention someone, use <@user-id>. <@1088521023466508478> is your own user ID.`,
     },
     ...conversation.map((line) => {
       const [author, content] = line.split(": ");
@@ -89,6 +101,12 @@ async function handleMessageCreate(client, msg, openai) {
   ];
 
   messageObjects.push({ role: "user", content: userInput });
+
+  messageObjects.push({
+    role: "user",
+    content: `Write "Summary: "then please provide a summary of the conversation so far. Then write "Answer:" and answer this question: ${userInput}`,
+  });
+
   console.log(messageObjects);
 
   const completion = await openai.createChatCompletion({
@@ -99,10 +117,18 @@ async function handleMessageCreate(client, msg, openai) {
     temperature: 0.7,
     messages: messageObjects,
   });
-  console.log(completion.data.choices[0].message.content);
 
-  const chatGPTResponse =
-    completion.data.choices[0].message.content.trim() || "";
+  const separator = "Answer: ";
+  const [summary, chatGPTResponse] = completion.data.choices[0].message.content
+    .trim()
+    .split(separator)
+    .map((part) => part.trim()) || ["", ""];
+
+  channelSummaries.set(channelId, summary);
+
+  // log the summary and response
+  console.log("", summary);
+  console.log("Response:", chatGPTResponse);
 
   if (!chatGPTResponse) {
     await thinkingMessage.edit(
