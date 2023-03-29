@@ -54,11 +54,19 @@ async function handleMessageCreate(client, msg, openai) {
 
   const thinkingMessage = await msg.reply("I'm thinking...");
 
-  const fetchedMessages = await msg.channel.messages.fetch({ limit: 6 });
+  const fetchedMessages = await msg.channel.messages.fetch({ limit: 100 });
   const conversation = fetchedMessages
     .filter((m) => m.id !== msg.id) // Exclude the current message
     .map((m) => `${m.author.username}: ${m.content}`)
-    .reverse(); // Reverse the order to make it chronological
+    .reverse() // Reverse the order to make it chronological
+    .reduce((acc, cur) => {
+      if (acc.length < 600) {
+        const newContent =
+          cur.length <= 600 - acc.length ? cur : cur.slice(0, 600 - acc.length);
+        acc.push(newContent);
+      }
+      return acc;
+    }, []);
 
   const messageObjects = [
     {
