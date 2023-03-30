@@ -109,14 +109,14 @@ async function handleMessageCreate(client, msg, openai) {
 
   messageObjects.push({
     role: "user",
-    content: `Write "Summary: "then please provide a summary of the conversation so far. Then write "Answer:" and answer this question: ${userInput}`,
+    content: `Write "Summary: "then please provide a summary of the conversation so far. Then write "Answer:" and answer this question: ${userInput}. Answer in the same language as the user question.`,
   });
 
   console.log(messageObjects);
 
   const completion = await openai.createChatCompletion({
     model: "gpt-3.5-turbo",
-    max_tokens: 600,
+    max_tokens: 800,
     n: 1,
     stop: null,
     temperature: 0.7,
@@ -144,6 +144,7 @@ async function handleMessageCreate(client, msg, openai) {
   }
 
   // Check if the channel name contains an emoji
+  // eslint-disable-next-line prefer-regex-literals
   const emojiRegex = new RegExp(
     "<a?:.+?:\\d{18}|\\p{Extended_Pictographic}",
     "gu"
