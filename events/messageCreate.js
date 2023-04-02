@@ -27,8 +27,11 @@ async function handleMessageCreate(client, msg, openai) {
     await Promise.all(
       links.map(async (link) => {
         try {
+          const options = {
+            rejectUnauthorized: false,
+          };
           const response = await new Promise((resolve, reject) => {
-            https.get(link, resolve).on("error", reject);
+            https.get(link, options, resolve).on("error", reject);
           });
           const html = await new Promise((resolve) => {
             let data = "";
@@ -39,17 +42,28 @@ async function handleMessageCreate(client, msg, openai) {
               resolve(data);
             });
           });
+
+          // Try parsing the HTML using Readability
           const doc = new JSDOM(html, { url: link });
           const reader = new Readability(doc.window.document);
           const article = reader.parse();
 
-          // Clean up the parsed text
-          const cleanedText = article.textContent
-            .trim()
-            .replace(/\n\s+/g, "\n") // Remove leading spaces on each line
-            .replace(/\n{3,}/g, "\n\n"); // Keep only one newline when there are multiple in a row
-
-          userInput = userInput.replace(link, `${link} - ${cleanedText}`);
+          // If Readability fails, use Html To Text to extract the text content
+          if (!article) {
+            userInput = userInput.replace(
+              link,
+              `${link} - Sorry, I couldn't extract the content for this page.`
+            );
+          } else {
+            // Clean up the parsed text
+            const maxCleanedArticleLength = 3000;
+            const cleanedText = article.textContent
+              .trim()
+              .substring(0, maxCleanedArticleLength)
+              .replace(/\n\s+/g, "\n") // Remove leading spaces on each line
+              .replace(/\n{3,}/g, "\n\n"); // Keep only one newline when there are multiple in a row
+            userInput = userInput.replace(link, `${link} - ${cleanedText}`);
+          }
         } catch (err) {
           console.error(`Error processing link: ${link}`, err);
           userInput = userInput.replace(
@@ -60,6 +74,7 @@ async function handleMessageCreate(client, msg, openai) {
       })
     );
   }
+
   // Replace 'EMOJI_NAME' with the name of the custom emoji you want to use
   const customEmoji = msg.guild.emojis.cache.find(
     (emoji) => emoji.name === "spinning_cat"
