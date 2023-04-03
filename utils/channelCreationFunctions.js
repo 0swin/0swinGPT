@@ -41,6 +41,8 @@ async function createPublicChannel(interaction) {
         content: `New channel ${newChannel} has been created!`,
         ephemeral: true,
       });
+      // Send a message in the new channel that mentions the user
+      newChannel.send(`${interaction.user}, welcome to your new channel!`);
     })
     .catch(console.error);
 }
@@ -98,6 +100,8 @@ async function createPrivateChannel(interaction) {
         content: `New private channel ${newChannel} has been created!`,
         ephemeral: true,
       });
+      // Send a message in the new channel that mentions the user
+      newChannel.send(`${interaction.user}, welcome to your new channel!`);
     })
     .catch(console.error);
 }
