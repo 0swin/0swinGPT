@@ -1,9 +1,9 @@
 // Import the necessary discord.js classes and Node.js modules
-const { Client, GatewayIntentBits } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-const dotenv = require('dotenv');
-const { Configuration, OpenAIApi } = require('openai');
+const { Client, GatewayIntentBits } = require("discord.js");
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
+const { Configuration, OpenAIApi } = require("openai");
 
 // Load environment variables from .env file
 dotenv.config();
@@ -31,42 +31,42 @@ const client = new Client({
 
 client.commands = new Map();
 
-const commandsPath = path.join(__dirname, 'commands');
+const commandsPath = path.join(__dirname, "commands");
 const commandFiles = fs
   .readdirSync(commandsPath)
-  .filter(file => file.endsWith('.js'));
+  .filter((file) => file.endsWith(".js"));
 
-commandFiles.forEach(file => {
+commandFiles.forEach((file) => {
   const filePath = path.join(commandsPath, file);
   // eslint-disable-next-line import/no-dynamic-require, global-require
   const command = require(filePath);
   client.commands.set(command.data.name, command);
 });
 
-client.once('ready', async () => {
-  console.log('Bot is ready!');
+client.once("ready", async () => {
+  console.log("Bot is ready!");
   // Define a list of command permissions
   const commandPermissions = [
     {
       id: adminRoleId,
-      type: 'ROLE',
+      type: "ROLE",
       permission: true,
     },
   ];
 
   // Register the commands with the command permissions
   await client.application.commands.set(
-    [...client.commands.values()].map(command => ({
+    [...client.commands.values()].map((command) => ({
       ...command.data,
       defaultPermission: false, // Disable the command for everyone by default
       permissions: command.restricted ? commandPermissions : [], // Apply the permissions only for restricted commands
-    })),
+    }))
   );
 
-  console.log('Slash commands registered');
+  console.log("Slash commands registered");
 });
 
-client.on('interactionCreate', async interaction => {
+client.on("interactionCreate", async (interaction) => {
   if (interaction.isCommand()) {
     const command = client.commands.get(interaction.commandName);
 
@@ -87,29 +87,29 @@ client.on('interactionCreate', async interaction => {
     } catch (error) {
       console.error(error);
       await interaction.reply({
-        content: 'There was an error while executing this command!',
+        content: "There was an error while executing this command!",
         ephemeral: true,
       });
     }
   } else if (interaction.isButton()) {
-    const command = client.commands.get('setup');
+    const command = client.commands.get("setup");
     if (!command) return;
     try {
       await command.handleButton(interaction);
     } catch (error) {
       console.error(error);
       await interaction.reply({
-        content: 'There was an error while executing this button interaction!',
+        content: "There was an error while executing this button interaction!",
         ephemeral: true,
       });
     }
   }
 });
 
-const handleMessageCreate = require('./events/messageCreate');
+const handleMessageCreate = require("./events/messageCreate");
 
-client.on('messageCreate', message =>
-  handleMessageCreate(client, message, openai),
+client.on("messageCreate", (message) =>
+  handleMessageCreate(client, message, openai)
 );
 
 client.login(token);
