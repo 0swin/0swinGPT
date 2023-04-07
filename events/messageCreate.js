@@ -1,6 +1,7 @@
 const https = require("https");
 const { Readability } = require("@mozilla/readability");
 const { JSDOM } = require("jsdom");
+const { checkModeration } = require("../utils/moderation");
 
 // Create a Map to store the summaries
 const channelSummaries = new Map();
@@ -18,6 +19,19 @@ async function handleMessageCreate(client, msg, openai) {
   if (!msg.mentions.has(client.user)) return;
 
   let userInput = msg.content.replace(/<@!?\d+>/, "").trim();
+  console.log(`User input: ${userInput}`);
+
+  // Check if the user message passes the Moderation API check
+  const moderationResults = await checkModeration(
+    process.env.OPENAI_API_KEY,
+    userInput
+  );
+  if (moderationResults.flagged) {
+    return msg.reply({
+      content: `Sorry, your message doesn't pass the moderation check. Please try again.`,
+      ephemeral: true,
+    });
+  }
 
   // Replace links in user input with their content
   const linkRegex = /(https?:\/\/[^\s]+)/g;
