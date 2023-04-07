@@ -5,10 +5,7 @@ const {
   PermissionFlagsBits,
 } = require("discord.js");
 
-const {
-  createPublicChannel,
-  createPrivateChannel,
-} = require("../utils/channelCreationFunctions");
+const { createChannel } = require("../utils/channelCreationFunctions");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -45,9 +42,9 @@ module.exports = {
 
     collector.on("collect", async (i) => {
       if (i.customId === "create_public_channel") {
-        await createPublicChannel(i);
+        await createChannel(i, "public");
       } else if (i.customId === "create_private_channel") {
-        await createPrivateChannel(i);
+        await createChannel(i, "private");
       }
     });
 
@@ -57,9 +54,9 @@ module.exports = {
   },
   async handleButton(interaction) {
     if (interaction.customId === "create_public_channel") {
-      await createPublicChannel(interaction);
+      await createChannel(interaction, "public");
     } else if (interaction.customId === "create_private_channel") {
-      await createPrivateChannel(interaction);
+      await createChannel(interaction, "private");
     }
   },
 };
