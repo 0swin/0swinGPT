@@ -1,7 +1,5 @@
-const https = require("https");
-const { Readability } = require("@mozilla/readability");
-const { JSDOM } = require("jsdom");
 const { checkModeration } = require("../utils/moderation");
+const { extractLinkContent } = require("../utils/replaceLinks");
 
 // Create a Map to store the summaries
 const channelSummaries = new Map();
@@ -40,51 +38,8 @@ async function handleMessageCreate(client, msg, openai) {
   if (links) {
     await Promise.all(
       links.map(async (link) => {
-        try {
-          const options = {
-            rejectUnauthorized: false,
-          };
-          const response = await new Promise((resolve, reject) => {
-            https.get(link, options, resolve).on("error", reject);
-          });
-          const html = await new Promise((resolve) => {
-            let data = "";
-            response.on("data", (chunk) => {
-              data += chunk;
-            });
-            response.on("end", () => {
-              resolve(data);
-            });
-          });
-
-          // Try parsing the HTML using Readability
-          const doc = new JSDOM(html, { url: link });
-          const reader = new Readability(doc.window.document);
-          const article = reader.parse();
-
-          // If Readability fails, use Html To Text to extract the text content
-          if (!article) {
-            userInput = userInput.replace(
-              link,
-              `${link} - Sorry, I couldn't extract the content for this page.`
-            );
-          } else {
-            // Clean up the parsed text
-            const maxCleanedArticleLength = 3000;
-            const cleanedText = article.textContent
-              .trim()
-              .substring(0, maxCleanedArticleLength)
-              .replace(/\n\s+/g, "\n") // Remove leading spaces on each line
-              .replace(/\n{3,}/g, "\n\n"); // Keep only one newline when there are multiple in a row
-            userInput = userInput.replace(link, `${link} - ${cleanedText}`);
-          }
-        } catch (err) {
-          console.error(`Error processing link: ${link}`, err);
-          userInput = userInput.replace(
-            link,
-            `${link} - Error processing link: ${err.message}`
-          );
-        }
+        const content = await extractLinkContent(link);
+        userInput = userInput.replace(link, content);
       })
     );
   }
@@ -138,7 +93,7 @@ async function handleMessageCreate(client, msg, openai) {
 
   messageObjects.push({
     role: "user",
-    content: `Write "Summary: "then please provide a summary of the conversation so far. Then write "Answer:" and answer this question: ${userInput}. Answer in the same language as the user question.`,
+    content: `Write "Summary: "then please provide a summary of the conversation so far, compressed in a way that fits a tweet, and such that you (GPT) can can reconstruct it as close as possible to the original, this is for yourself, do not make it human readable, abuse of language mixing, abbreviations, symbols (unicode and emojis) to aggressively compress it, while still keeping ALL the information to fully reconstruct it. Then write "Answer:" and answer this message in the same language: ${userInput}.`,
   });
 
   console.log(messageObjects);
@@ -182,7 +137,7 @@ async function handleMessageCreate(client, msg, openai) {
     const messages = [
       {
         role: "system",
-        content: `Create a new channel name following this template: "emoji-keyword1-keyword2". For example, "🤖-emoji-testing". Choose two keywords from this paragraph: ${chatGPTResponse}`,
+        content: `Create a new channel title name following this template: "emoji-keyword1-keyword2-keyword3". For example, "🤖-robot-emoji-testing". Choose three keywords from this paragraph: ${chatGPTResponse}.`,
       },
     ];
 
