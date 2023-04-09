@@ -11,16 +11,23 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const channelSummaries = new Map();
 
 async function updateOrCreateUser(msg) {
+  if (!msg || !msg.author || !msg.author.id || !msg.author.username) {
+    console.error("Invalid message object");
+    return;
+  }
+
   try {
-    const { data: users } = await supabase
+    const { data: users, error: usersError } = await supabase
       .from("users")
       .select("discord_id, total_messages, messages_today, last_updated")
       .eq("discord_id", msg.author.id);
 
+    if (usersError) throw usersError;
+
     if (users.length === 0) {
       console.log("User doesn't exist");
       // if user doesn't exist, create them
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("users")
         .insert([
           {
@@ -33,11 +40,17 @@ async function updateOrCreateUser(msg) {
           },
         ])
         .single();
+      if (error) throw error;
       console.log("Created user", msg.author.username);
     } else if (users.length === 1) {
       const user = users[0];
       const lastUpdated = new Date(user.last_updated);
       const today = new Date();
+
+      const updateData = {
+        total_messages: user.total_messages + 1,
+        last_updated: new Date(),
+      };
 
       if (
         lastUpdated.getDate() !== today.getDate() ||
@@ -45,34 +58,25 @@ async function updateOrCreateUser(msg) {
         lastUpdated.getFullYear() !== today.getFullYear()
       ) {
         // reset messages_today count if last_updated is not today
-        const { data, error } = await supabase
-          .from("users")
-          .update({
-            total_messages: user.total_messages + 1,
-            messages_today: 1,
-            last_updated: new Date(),
-          })
-          .eq("discord_id", msg.author.id)
-          .single();
+        updateData.messages_today = 1;
         console.log(
           "Reset messages_today count for user ",
           msg.author.username
         );
       } else {
-        const { data, error } = await supabase
-          .from("users")
-          .update({
-            total_messages: user.total_messages + 1,
-            messages_today: user.messages_today + 1,
-            last_updated: new Date(),
-          })
-          .eq("discord_id", msg.author.id)
-          .single();
+        updateData.messages_today = user.messages_today + 1;
         console.log("Updated user ", msg.author.username);
       }
+
+      const { data, error } = await supabase
+        .from("users")
+        .update(updateData)
+        .eq("discord_id", msg.author.id)
+        .single();
+      if (error) throw error;
     }
   } catch (error) {
-    console.log("Error creating user", error);
+    console.error("Error creating or updating user", error);
   }
 }
 
@@ -104,6 +108,8 @@ async function handleMessageCreate(client, msg, openai) {
   }
 
   updateOrCreateUser(msg);
+
+  return;
 
   // Replace links in user input with their content
   const linkRegex = /(https?:\/\/[^\s]+)/g;
