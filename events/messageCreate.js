@@ -116,7 +116,10 @@ async function handleMessageCreate(client, msg, openai) {
     .eq("discord_id", msg.author.id)
     .single();
   if (usersError) throw usersError;
-  if (users.messages_today >= 100) {
+  const dailyLimit = msg.member.roles.cache.some((role) => role.name === "VIP")
+    ? 200
+    : 100;
+  if (users.messages_today >= dailyLimit) {
     return msg.reply({
       content: `Sorry, you have reached your daily message limit. Please try again tomorrow.`,
     });
@@ -215,7 +218,7 @@ async function handleMessageCreate(client, msg, openai) {
     msg.reply("I'm sorry, I couldn't generate a response. Please try again.");
   } else {
     try {
-      updateOrCreateUser(msg);
+      await updateOrCreateUser(msg);
 
       const { data: users, error } = await supabase
         .from("users")
@@ -228,7 +231,7 @@ async function handleMessageCreate(client, msg, openai) {
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("message_count")
-          .setLabel(`🔋 ${users.messages_today} / 100`)
+          .setLabel(`🔋 ${users.messages_today} / ${dailyLimit}`)
           .setStyle("Secondary"),
         new ButtonBuilder()
           .setCustomId("current_user")
