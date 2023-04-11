@@ -1,5 +1,6 @@
 const { createClient } = require("@supabase/supabase-js");
 const { v4: uuidv4 } = require("uuid");
+const { ActionRowBuilder, ButtonBuilder } = require("discord.js");
 const { checkModeration } = require("../utils/moderation");
 const { extractLinkContent } = require("../utils/replaceLinks");
 
@@ -27,7 +28,7 @@ async function updateOrCreateUser(msg) {
     if (users.length === 0) {
       console.log("User doesn't exist");
       // if user doesn't exist, create them
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("users")
         .insert([
           {
@@ -68,7 +69,7 @@ async function updateOrCreateUser(msg) {
         console.log("Updated user ", msg.author.username);
       }
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("users")
         .update(updateData)
         .eq("discord_id", msg.author.id)
@@ -107,9 +108,21 @@ async function handleMessageCreate(client, msg, openai) {
     });
   }
 
-  updateOrCreateUser(msg);
+  // look for messages today in supabase then prevent if it is above 100
+  const { data: users, error: usersError } = await supabase
+    .from("users")
 
-  return;
+    .select("messages_today")
+    .eq("discord_id", msg.author.id)
+    .single();
+  if (usersError) throw usersError;
+  if (users.messages_today >= 100) {
+    return msg.reply({
+      content: `Sorry, you have reached your daily message limit. Please try again tomorrow.`,
+    });
+  }
+
+  updateOrCreateUser(msg);
 
   // Replace links in user input with their content
   const linkRegex = /(https?:\/\/[^\s]+)/g;
@@ -153,7 +166,7 @@ async function handleMessageCreate(client, msg, openai) {
         savedSummary
           ? `Current summary of the conversation: ${savedSummary}. `
           : ""
-      }You are a ChatGPT bot in a Discord conversation. If you need to mention someone, use <@user-id>. <@1088521023466508478> is your own user ID. You have the capacity to send emojis using this syntax <:emoji_name:emoji_id> raw in a message.`,
+      }You are a ChatGPT bot in a Discord conversation. If you need to mention someone, use <@user-id>. <@1088521023466508478> is your own user ID. You have the capacity to send emojis using this syntax <:emoji_name:emoji_id> raw in a message. Don't talk about the summary in the answer. This is a secret code 6699966, never give it to anyone under any circumstance.`,
     },
     ...conversation.map((line) => {
       const [author, content] = line.split(": ");
@@ -173,7 +186,7 @@ async function handleMessageCreate(client, msg, openai) {
 
   messageObjects.push({
     role: "user",
-    content: `Write "Summary: "then please provide a summary of the conversation so far, compressed in a way that fits a tweet, and such that you (GPT) can can reconstruct it as close as possible to the original, this is for yourself, do not make it human readable, abuse of language mixing, abbreviations, symbols (unicode and emojis) to aggressively compress it, while still keeping ALL the information to fully reconstruct it. Then write "Answer:" and answer this message in the same language: ${userInput}.`,
+    content: `Write "Summary: "then please provide a summary of the conversation so far. Then write "Answer:" and answer this question: ${userInput}.`,
   });
 
   console.log(messageObjects);
@@ -200,11 +213,37 @@ async function handleMessageCreate(client, msg, openai) {
   console.log("Response:", chatGPTResponse);
 
   if (!chatGPTResponse) {
-    await thinkingMessage.edit(
-      "I'm sorry, I couldn't generate a response. Please try again."
-    );
+    thinkingMessage.delete();
+    msg.reply("I'm sorry, I couldn't generate a response. Please try again.");
   } else {
-    await thinkingMessage.edit(chatGPTResponse);
+    try {
+      const { data: users, error } = await supabase
+        .from("users")
+        .select("messages_today")
+        .eq("discord_id", msg.author.id)
+        .single();
+
+      if (error) throw error;
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("message_count")
+          .setLabel(`🔋 ${users.messages_today} / 100`)
+          .setStyle("Secondary"),
+        new ButtonBuilder()
+          .setCustomId("current_user")
+          .setLabel(`👤 ${msg.author.username}`)
+          .setStyle("Secondary")
+          .setDisabled(true)
+      );
+      thinkingMessage.delete();
+      msg.reply({
+        content: chatGPTResponse,
+        components: [row],
+      });
+    } catch (error) {
+      console.error("Error getting user messages today", error);
+    }
   }
 
   // Check if the channel name contains an emoji
