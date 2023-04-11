@@ -122,8 +122,6 @@ async function handleMessageCreate(client, msg, openai) {
     });
   }
 
-  updateOrCreateUser(msg);
-
   // Replace links in user input with their content
   const linkRegex = /(https?:\/\/[^\s]+)/g;
   const links = userInput.match(linkRegex);
@@ -193,7 +191,7 @@ async function handleMessageCreate(client, msg, openai) {
 
   const completion = await openai.createChatCompletion({
     model: "gpt-3.5-turbo",
-    max_tokens: 800,
+    max_tokens: 2000,
     n: 1,
     stop: null,
     temperature: 0.7,
@@ -217,6 +215,8 @@ async function handleMessageCreate(client, msg, openai) {
     msg.reply("I'm sorry, I couldn't generate a response. Please try again.");
   } else {
     try {
+      updateOrCreateUser(msg);
+
       const { data: users, error } = await supabase
         .from("users")
         .select("messages_today")
@@ -256,7 +256,7 @@ async function handleMessageCreate(client, msg, openai) {
     const messages = [
       {
         role: "system",
-        content: `Create a new channel title name following this template: "emoji-keyword1-keyword2-keyword3". For example, "🤖-robot-emoji-testing". Choose three keywords from this paragraph: ${chatGPTResponse}.`,
+        content: `What is a suitable two-emoji and three-word-hyphenated title for this conversation summary ?: ${chatGPTResponse}.`,
       },
     ];
 
