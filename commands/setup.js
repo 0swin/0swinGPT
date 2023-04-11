@@ -28,7 +28,7 @@ module.exports = {
     );
 
     await interaction.reply({
-      content: "Here's a message with two buttons:",
+      content: "Click on a button to create a new channel:",
       components: [row],
       ephemeral: false,
     });
