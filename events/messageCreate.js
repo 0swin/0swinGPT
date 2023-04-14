@@ -111,15 +111,36 @@ async function handleMessageCreate(client, msg, openai) {
   // look for messages today in supabase then prevent if it is above 100
   const { data: users, error: usersError } = await supabase
     .from("users")
-
     .select("messages_today")
-    .eq("discord_id", msg.author.id)
-    .single();
+    .eq("discord_id", msg.author.id);
+
   if (usersError) throw usersError;
+
+  let userData = users.length > 0 ? users[0] : null;
+
+  if (!userData) {
+    // if user doesn't exist, create them
+    console.log("User doesn't exist");
+    const { data: newUser, error } = await supabase.from("users").insert([
+      {
+        id: uuidv4(),
+        discord_id: msg.author.id,
+        username: msg.author.username,
+        total_messages: 1,
+        messages_today: 1,
+        last_updated: new Date(),
+      },
+    ]);
+    if (error) throw error;
+    console.log("Created user", msg.author.username);
+    userData = newUser[0];
+  }
+
   const dailyLimit = msg.member.roles.cache.some((role) => role.name === "VIP")
     ? 200
     : 100;
-  if (users.messages_today >= dailyLimit) {
+
+  if (userData.messages_today >= dailyLimit) {
     return msg.reply({
       content: `Sorry, you have reached your daily message limit. Please try again tomorrow.`,
     });
