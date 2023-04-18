@@ -159,14 +159,6 @@ async function handleMessageCreate(client, msg, openai) {
     );
   }
 
-  // Replace 'EMOJI_NAME' with the name of the custom emoji you want to use
-  const customEmoji = msg.guild.emojis.cache.find(
-    (emoji) => emoji.name === "spinning_cat"
-  );
-  const thinkingMessage = await msg.reply(
-    `I'm thinking... ${customEmoji.toString()}`
-  );
-
   const fetchedMessages = await msg.channel.messages.fetch({ limit: 100 });
   const conversation = fetchedMessages
     .filter((m) => m.id !== msg.id) // Exclude the current message
@@ -180,6 +172,14 @@ async function handleMessageCreate(client, msg, openai) {
       }
       return acc;
     }, []);
+
+  // Replace 'EMOJI_NAME' with the name of the custom emoji you want to use
+  const customEmoji = msg.guild.emojis.cache.find(
+    (emoji) => emoji.name === "spinning_cat"
+  );
+  const thinkingMessage = await msg.reply(
+    `I'm thinking... ${customEmoji.toString()}`
+  );
 
   const messageObjects = [
     {
