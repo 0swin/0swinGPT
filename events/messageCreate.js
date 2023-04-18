@@ -81,6 +81,11 @@ async function updateOrCreateUser(msg) {
   }
 }
 
+function splitString(str, maxLength) {
+  const regex = new RegExp(`.{1,${maxLength}}`, "g");
+  return str.match(regex);
+}
+
 async function handleMessageCreate(client, msg, openai) {
   if (msg.author.bot) return; // Ignore messages from bots
 
@@ -217,16 +222,23 @@ async function handleMessageCreate(client, msg, openai) {
     content: `Write "Summary: "then please provide a summary of the conversation so far. Then write "Answer:" and answer this question: ${userInput}.`,
   });
 
-  console.log(messageObjects);
-
-  const completion = await openai.createChatCompletion({
-    model: "gpt-3.5-turbo",
-    max_tokens: 2000,
-    n: 1,
-    stop: null,
-    temperature: 0.7,
-    messages: messageObjects,
-  });
+  let completion;
+  try {
+    completion = await openai.createChatCompletion({
+      model: "gpt-3.5-turbo",
+      max_tokens: 2000,
+      n: 1,
+      stop: null,
+      temperature: 0.7,
+      messages: messageObjects,
+    });
+    console.log(completion.data.choices[0].text); // Print the response
+  } catch (error) {
+    console.log(`Error: ${error}`);
+    thinkingMessage.delete();
+    msg.reply(`I'm sorry, I couldn't generate a response. Please try again.`);
+    return;
+  }
 
   const separator = "Answer:";
   const [summary, chatGPTResponse] = completion.data.choices[0].message.content
@@ -240,41 +252,60 @@ async function handleMessageCreate(client, msg, openai) {
   console.log("", summary);
   console.log("Response:", chatGPTResponse);
 
-  if (!chatGPTResponse) {
+  try {
+    await updateOrCreateUser(msg);
+
+    const { data: users, error } = await supabase
+      .from("users")
+      .select("messages_today")
+      .eq("discord_id", msg.author.id)
+      .single();
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("message_count")
+        .setLabel(`🔋 ${users.messages_today} / ${dailyLimit}`)
+        .setStyle("Secondary")
+        .setDisabled(true),
+      new ButtonBuilder()
+        .setCustomId("current_user")
+        .setLabel(`👤 ${msg.author.username}`)
+        .setStyle("Secondary")
+        .setDisabled(true)
+    );
     thinkingMessage.delete();
-    msg.reply("I'm sorry, I couldn't generate a response. Please try again.");
-  } else {
-    try {
-      await updateOrCreateUser(msg);
 
-      const { data: users, error } = await supabase
-        .from("users")
-        .select("messages_today")
-        .eq("discord_id", msg.author.id)
-        .single();
-
-      if (error) throw error;
-
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId("message_count")
-          .setLabel(`🔋 ${users.messages_today} / ${dailyLimit}`)
-          .setStyle("Secondary")
-          .setDisabled(true),
-        new ButtonBuilder()
-          .setCustomId("current_user")
-          .setLabel(`👤 ${msg.author.username}`)
-          .setStyle("Secondary")
-          .setDisabled(true)
+    // Check if the chatGPTResponse message is longer than 2000 characters
+    if (chatGPTResponse.length > 2000) {
+      const chunks = splitString(chatGPTResponse, 2000);
+      // Send each chunk as a separate message
+      await Promise.all(
+        chunks.map(async (chunk, index) => {
+          if (index === 0) {
+            await msg.reply({
+              content: chunk,
+            });
+          } else {
+            await msg.channel.send({
+              content: chunk,
+            });
+          }
+          // Add components only to the last chunk
+          if (index === chunks.length - 1) {
+            await msg.channel.send({
+              components: [row],
+            });
+          }
+        })
       );
-      thinkingMessage.delete();
-      msg.reply({
+    } else {
+      await msg.reply({
         content: chatGPTResponse,
         components: [row],
       });
-    } catch (error) {
-      console.error("Error getting user messages today", error);
     }
+  } catch (error) {
+    console.error("Error getting user messages today", error);
   }
 
   // Check if the channel name contains an emoji
@@ -312,5 +343,4 @@ async function handleMessageCreate(client, msg, openai) {
     }
   }
 }
-
 module.exports = handleMessageCreate;
