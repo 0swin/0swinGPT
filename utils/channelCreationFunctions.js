@@ -4,9 +4,6 @@ async function createChannel(interaction, channelType) {
   let category;
   let channelNamePrefix;
   let reason;
-  let allowAccess;
-  let denyAccess;
-  let newChannelName;
 
   if (channelType === "public") {
     category = interaction.guild.channels.cache.find(
@@ -16,8 +13,6 @@ async function createChannel(interaction, channelType) {
     );
     channelNamePrefix = "new-channel-";
     reason = "Created a new text channel";
-    allowAccess = [PermissionFlagsBits.ViewChannel];
-    denyAccess = [];
   } else if (channelType === "private") {
     category = interaction.guild.channels.cache.find(
       (channel) =>
@@ -27,10 +22,6 @@ async function createChannel(interaction, channelType) {
     const userName = interaction.user.username;
     channelNamePrefix = `private-${userName}-`;
     reason = "Created a new private text channel";
-    const userId = interaction.user.id;
-    allowAccess = [PermissionFlagsBits.ViewChannel];
-    denyAccess = [PermissionFlagsBits.ViewChannel];
-    denyAccess.push(interaction.guild.roles.everyone);
   } else {
     interaction.reply({
       content: "Invalid channel type",
@@ -50,15 +41,12 @@ async function createChannel(interaction, channelType) {
     .sort((a, b) => a - b);
 
   let newChannelNumber = 1;
-  for (const channelNumber of existingChannelNumbers) {
-    if (channelNumber === newChannelNumber) {
-      newChannelNumber++;
-    } else {
-      break;
-    }
+  const existingChannelNumbersSet = new Set(existingChannelNumbers);
+  while (existingChannelNumbersSet.has(newChannelNumber)) {
+    newChannelNumber += 1;
   }
 
-  newChannelName = `${channelNamePrefix}${newChannelNumber}`;
+  const newChannelName = `${channelNamePrefix}${newChannelNumber}`;
 
   interaction.guild.channels
     .create({
@@ -69,13 +57,17 @@ async function createChannel(interaction, channelType) {
       permissionOverwrites: [
         {
           id: interaction.guild.roles.everyone,
-          deny: [PermissionFlagsBits.ViewChannel],
+          allow:
+            channelType === "public" ? [PermissionFlagsBits.ViewChannel] : [],
+          deny:
+            channelType === "private" ? [PermissionFlagsBits.ViewChannel] : [],
         },
         {
           id: interaction.user.id,
           allow: [PermissionFlagsBits.ViewChannel],
         },
       ],
+
       reason,
     })
     .then((newChannel) => {
