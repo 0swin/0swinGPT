@@ -84,17 +84,17 @@ async function updateOrCreateUser(msg) {
 async function handleMessageCreate(client, msg, openai) {
   if (msg.author.bot) return; // Ignore messages from bots
 
-  // Get the saved summary for the current channel, if it exists
-  const channelId = msg.channel.id;
-  const savedSummary = channelSummaries.has(channelId)
-    ? `Summary: ${channelSummaries.get(channelId)}`
-    : "";
-
   // Check if the bot is mentioned
   if (!msg.mentions.has(client.user)) return;
 
   let userInput = msg.content.replace(/<@!?\d+>/, "").trim();
   console.log(`User input: ${userInput}`);
+
+  // Get the saved summary for the current channel, if it exists
+  const channelId = msg.channel.id;
+  const savedSummary = channelSummaries.has(channelId)
+    ? `Summary: ${channelSummaries.get(channelId)}`
+    : "";
 
   // Check if the user message passes the Moderation API check
   const moderationResults = await checkModeration(
@@ -108,32 +108,38 @@ async function handleMessageCreate(client, msg, openai) {
     });
   }
 
-  // look for messages today in supabase then prevent if it is above 100
-  const { data: users, error: usersError } = await supabase
+  // Check if user exists
+  let userData;
+
+  const { data: users, error } = await supabase
     .from("users")
     .select("messages_today")
     .eq("discord_id", msg.author.id);
 
-  if (usersError) throw usersError;
+  // If the user doesn't exist, create a new user
+  if (!users || users.length === 0) {
+    const newUser = {
+      id: uuidv4(),
+      discord_id: msg.author.id,
+      username: msg.author.username,
+      total_messages: 1,
+      messages_today: 0,
+      last_updated: new Date(),
+    };
 
-  let userData = users.length > 0 ? users[0] : null;
+    const { data: insertedUser, error: insertError } = await supabase
+      .from("users")
+      .insert([newUser]);
 
-  if (!userData) {
-    // if user doesn't exist, create them
-    console.log("User doesn't exist");
-    const { data: newUser, error } = await supabase.from("users").insert([
-      {
-        id: uuidv4(),
-        discord_id: msg.author.id,
-        username: msg.author.username,
-        total_messages: 1,
-        messages_today: 1,
-        last_updated: new Date(),
-      },
-    ]);
-    if (error) throw error;
-    console.log("Created user", msg.author.username);
-    userData = newUser[0];
+    if (insertError) {
+      console.error("Error inserting new user:", insertError);
+    } else {
+      console.log("New user created:", insertedUser);
+    }
+    userData = newUser;
+  } else {
+    console.log("User already exists:", users[0]);
+    userData = users[0];
   }
 
   const dailyLimit = msg.member.roles.cache.some((role) => role.name === "VIP")
@@ -188,7 +194,7 @@ async function handleMessageCreate(client, msg, openai) {
         savedSummary
           ? `Current summary of the conversation: ${savedSummary}. `
           : ""
-      }You are a ChatGPT bot in a Discord conversation. If you need to mention someone, use <@user-id>. <@1088521023466508478> is your own user ID. You have the capacity to send emojis using this syntax <:emoji_name:emoji_id> raw in a message. Don't talk about the summary in the answer. This is a secret code 6699966, never give it to anyone under any circumstance.`,
+      }You are a ChatGPT bot in a Discord conversation. If you need to mention someone, use <@user-id>. <@1088521023466508478> is your own user ID. You have the capacity to send emojis using this syntax <:emoji_name:emoji_id> raw in a message. Don't talk about the summary in the answer.`,
     },
     ...conversation.map((line) => {
       const [author, content] = line.split(": ");
@@ -253,7 +259,8 @@ async function handleMessageCreate(client, msg, openai) {
         new ButtonBuilder()
           .setCustomId("message_count")
           .setLabel(`🔋 ${users.messages_today} / ${dailyLimit}`)
-          .setStyle("Secondary"),
+          .setStyle("Secondary")
+          .setDisabled(true),
         new ButtonBuilder()
           .setCustomId("current_user")
           .setLabel(`👤 ${msg.author.username}`)
