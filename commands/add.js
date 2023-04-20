@@ -26,7 +26,7 @@ module.exports = {
 
     // Check if the current user has MANAGE_MESSAGES permission and if the @everyone role is denied VIEW_CHANNEL permission
     if (
-      channel.permissionsFor(user).has("MANAGE_MESSAGES") &&
+      channel.permissionsFor(user).has(PermissionFlagsBits.ManageMessages) &&
       everyoneDeniedViewChannel
     ) {
       await channel.permissionOverwrites.edit(userToAdd.id, {
@@ -34,8 +34,7 @@ module.exports = {
       });
 
       await interaction.reply({
-        content: `User ${userToAdd} has been added to ${channel}`,
-        ephemeral: true,
+        content: `Welcome ${userToAdd} to ${channel}`,
       });
     } else {
       await interaction.reply({
