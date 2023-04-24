@@ -1,12 +1,10 @@
 {
-  "extends": ["airbnb-base", "plugin:prettier/recommended"],
-  "plugins": ["prettier"],
+  "extends": "@antfu",
   "env": {
     "node": true,
     "es2021": true
   },
   "rules": {
-    "prettier/prettier": "error",
     "no-console": "off",
     "consistent-return": "off",
     "prefer-destructuring": "off"
