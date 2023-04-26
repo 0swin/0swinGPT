@@ -87,9 +87,12 @@ async function updateOrCreateUser(msg) {
   }
 }
 
-function splitString(str, maxLength) {
-  const regex = new RegExp(`.{1,${maxLength}}`, 'g')
-  return str.match(regex)
+function splitString(str, size) {
+  const chunks = []
+  for (let i = 0; i < str.length; i += size)
+    chunks.push(str.slice(i, i + size))
+
+  return chunks
 }
 
 async function handleMessageCreate(client, msg, openai) {
