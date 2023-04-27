@@ -1,29 +1,5 @@
-# flyctl launch added from .gitignore
-# Node.js
-**/node_modules
-**/npm-debug.log
-
-# Dependency directories
-**/.jscpd-report
-**/.jest
-**/.eslintcache
-**/.prettierignore
-**/.prettierrc
-**/.eslintrc
-
-# Editor directories and files
-**/.idea
-**/.vscode
-**/*.suo
-**/*.ntvs*
-**/*.njsproj
-**/*.sln
-**/*.sw?
-**/*.bak
-**/*.tmp
-**/*~
-**/.DS_Store
-**/.env
-**/config.json
-
 fly.toml
+Dockerfile
+.dockerignore
+node_modules
+.git
